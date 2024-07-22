@@ -58,7 +58,7 @@ jobs:
     strategy:
         matrix:
           os: [ubuntu-22.04]
-          install_option : ["--version ${{ needs.set_env.outputs.ref_name }}", "v24.05.06"]
+          version : ["--version ${{ needs.set_env.outputs.ref_name }}", "--version v24.05.06", ""]
           with_openCV : ["", "--install-opencv"]
 
     steps:
@@ -67,7 +67,7 @@ jobs:
           mkdir setup_dir && cd setup_dir
           wget -O setup.sh https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/setup.sh
           chmod +x ${GITHUB_WORKSPACE}/setup_dir/setup.sh
-          sudo bash setup.sh ${{ matrix.install_option }} ${{ matrix.with_openCV }} --verbose
+          sudo bash setup.sh ${{ matrix.version }} ${{ matrix.with_openCV }} --verbose
 
       - name: Check if version_info.json exists
         id: check_version_info
@@ -117,7 +117,7 @@ jobs:
     strategy:
         matrix:
           os: [windows-2019, windows-latest]
-          version : ["${{ needs.set_env.outputs.ref_name }}", "v24.05.06", "v24.01.04"]
+          version : ["-version ${{ needs.set_env.outputs.ref_name }}", "-version v24.05.06", "-version v24.01.04", ""]
           with_openCV : ["", "-InstallOpenCV"]
           exclude:
             - os: windows-latest
@@ -126,12 +126,15 @@ jobs:
             - os: windows-latest
               with_openCV: "-InstallOpenCV"
               version: "-version 24.01.04"
+            - os: windows-latest
+              with_openCV: "-InstallOpenCV"
+              version: ""
     steps:
       - name: Download installer & install
         run: |
           $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/installer.ps1"
           Invoke-WebRequest $url -OutFile .\installer.ps1
-          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 -version ${{ matrix.version }} ${{ matrix.with_openCV }} -verbose
+          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 ${{ matrix.version }} ${{ matrix.with_openCV }} -verbose
 
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
@@ -140,6 +143,7 @@ jobs:
           path: download
 
       - name: Check if version_info.json exists
+        if: ${{ ! (matrix.version == '-version v24.01.04') }}
         run: |
           $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
           $target_file = Join-Path -Path "$SENSING_DEV_ROOT" -ChildPath "version_info.json"
@@ -171,12 +175,23 @@ jobs:
           cd Release && ls && ./ionkit_test
 
       - name: Test opencv (general)
-        if: ${{ (matrix.os == 'windows-2019') && (matrix.with_openCV == '-InstallOpenCV')}}
+        if: ${{ (matrix.os == 'windows-2019') && (matrix.with_openCV == '-InstallOpenCV') && !(matrix.version == '-version v24.01.04')}}
         run: |
           $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
           $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
           $env:SENSING_DEV_ROOT=${SENSING_DEV_ROOT} 
           $env:PATH="$env:PATH;$PATH"
           cd ${{ github.workspace }}/download/installer/testcases/cpp/opencv_test  && cmake ./
+          cmake --build . --config Release 
+          cd Release && ./opencv_test
+
+      - name: Test opencv (-version v24.01.04)
+        if: ${{ matrix.version == '-version v24.01.04' }}
+        run: |
+          $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
+          $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
+          $env:SENSING_DEV_ROOT=${SENSING_DEV_ROOT} 
+          $env:PATH="$env:PATH;$PATH"
+          cd ${{ github.workspace }}/download/installer/testcases/cpp/opencv_test_v240104  && cmake ./
           cmake --build . --config Release 
           cd Release && ./opencv_test
