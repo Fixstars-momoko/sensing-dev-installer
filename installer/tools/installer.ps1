@@ -105,6 +105,70 @@ function Get-LatestVersion {
 
 
 
+function CheckSDKVersion(){
+  param(
+    [string]$sdkversion
+  )
+
+  try {
+    # Write-Host "https://github.com/$repositoryName/releases/$sdkversion"
+    $response = Invoke-WebRequest -Uri "https://github.com/$repositoryName/releases/tag/$sdkversion" -ErrorAction Stop 
+    
+    if ($response.StatusCode -ne 200){
+      Write-Error "Version $sdkversion does not exist"
+      exit 1
+    }
+
+  } catch {
+    Write-Error "Version $sdkversion does not exist"
+    exit 1
+  }
+}
+
+
+
+function InstallEarlierVersion(){
+  param(
+    [string]$sdkversion,
+    [bool]$withOpenCV,
+    [string]$referenceVersion = "v24.05.99"
+  )
+
+  $versionToCheck = $sdkversion.TrimStart('v')
+  $referenceVersion = $referenceVersion.TrimStart('v')
+
+  $versionParts = $versionToCheck.Split('.') | ForEach-Object { [int]$_ }
+  $referenceParts = $referenceVersion.Split('.') | ForEach-Object { [int]$_ }
+
+  for ($i = 0; $i -lt $versionParts.Length; $i++) {
+      if ($versionParts[$i] -lt $referenceParts[$i]) {
+        try {
+          $prevInstallerURL = "${baseUrl}${version}/installer.ps1"
+          $prevInstallerPath = "$tempWorkDir/old_installer.ps1"
+          Invoke-WebRequest -Uri $prevInstallerURL -OutFile $prevInstallerPath
+          if ($withOpenCV){
+            & $prevInstallerPath -version:$sdkversion -InstallOpenCV -user:$Env:UserName
+          }else{
+            & $prevInstallerPath -version:$sdkversion -user:$Env:UserName
+          }
+          
+          return $true
+        } catch {
+          Write-Error "Failed to download $sdkversion"
+          exit 1
+        }
+
+      } elseif ($versionParts[$i] -gt $referenceParts[$i]) {
+        return $false
+      }
+  }
+
+
+
+}
+
+
+
 function CheckComponentHash(){
   param(
     [string]$compName,
@@ -355,6 +419,7 @@ function Invoke-Script {
     ################################################################################
     # Get Version & config of components
     ################################################################################
+    # mainly for debug purpose (using config_Windows.json to specify versions)
     $configFileName = "config_Windows.json"
     if ($configPath){
       Write-Verbose "Found local $configFileName = $configPath"
@@ -372,16 +437,32 @@ function Invoke-Script {
       }
     }
 
+    # suggested installation (w/ or w/o version setting)
     if (-not $version) {
       $version = Get-LatestVersion
+    }else{
+      CheckSDKVersion -sdkversion $version
     }
+    
     Write-Host "Sensing-Dev $version will be installed." -ForegroundColor Green
+    $installed = InstallEarlierVersion -sdkversion $version -withOpenCV $InstallOpenCV
+    if ( $installed ){
+      # Exit here if earlier version is installed.
+      Write-Host "Install successfully."
+      exit 0
+    }
 
     if (-not $configPath){
-      $configURL = "${baseUrl}${version}/$configFileName"
-      $configPath = "$tempWorkDir/$configFileName"
-      Invoke-WebRequest -Uri $configURL -OutFile $configPath
-      $content = Get-ConfigContent -configPath $configPath
+      try{
+        $configURL = "${baseUrl}${version}/$configFileName"
+        $configPath = "$tempWorkDir/$configFileName"
+        Invoke-WebRequest -Uri $configURL -OutFile $configPath
+        $content = Get-ConfigContent -configPath $configPath
+      } catch {
+        Write-Error "Failed to obtain $configFileName of $version"
+        exit 1
+      }
+
     } 
     
     ################################################################################

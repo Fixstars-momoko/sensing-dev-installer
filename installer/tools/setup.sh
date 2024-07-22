@@ -87,6 +87,49 @@ get_latest_version() {
     sed -E 's/.*"([^"]+)".*/\1/'                                    # Pluck JSON value
 }
 
+check_sdk_version() {
+    sdkversion=$1
+    verbose "Check if $sdkversion exists..."
+
+    url="https://github.com/$repositoryName/releases/tag/$sdkversion"
+    verbose "URL: $url"
+
+    if curl --output /dev/null--silent --head --fail "$url"; then
+      verbose "Valid version"
+    else
+      error "Version $sdkversion does not exist"
+      exit 1
+    fi
+}
+
+install_eariler_version() {
+  reference_version=240506
+
+  if [[ ! "$1" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[a-zA-Z0-9]*)?$ ]]; then
+    error "Invalid version format. Expected format is vXX.YY.ZZ or xXX.YY.ZZ-<testid>"
+    exit 1
+  fi
+
+  version_major="${BASH_REMATCH[1]}"
+  version_minor="${BASH_REMATCH[2]}"
+  version_patch="${BASH_REMATCH[3]}"
+
+  version_int=$((${version_major#0} * 10000 + ${version_minor#0} * 100 + ${version_patch#0}))
+
+  if [ "$version_int" -le "$reference_version" ]; then
+    prev_installer_url="$baseUrl$1/setup.sh"
+    prev_installer_path="$2/tmp/old_setup.sh"
+    mkdir -p "$2/tmp"
+    curl -L $prev_installer_url -o "$prev_installer_path"
+    verbose "Execute old_setup.sh ($1) in $prev_installer_path"
+    bash $prev_installer_path --install-opencv $3 --version $1
+
+    info "Install successfully."
+    exit 0
+  fi
+
+}
+
 verbose "version: $version"
 verbose "user: $user"
 verbose "installPath: $installPath"
@@ -170,9 +213,12 @@ fi
 if [ -z "$version" ]; then
   verbose "Getting the latest version..."
   version=`get_latest_version $repositoryName`
+else
+  check_sdk_version $version 
 fi
 
 info "Sensing-Dev $version will be installed."
+install_eariler_version $version $installPath $InstallOpenCV
 
 if [ -z "$configPath" ]; then
   info "Download SDK Component config file..."

@@ -1,59 +1,36 @@
 libraries:
   aravis:
     name: aravis
-    src_path: aravis
-    install_path: install/aravis
-    action: download # can be 'download', 'build', or 'use_existing'
-    pkg_url: "https://github.com/Sensing-Dev/aravis/releases/download/internal-0.8.30/aravis-internal-0.8.30-win64.zip"
     pkg_sha: "1f0ef68a9d33f9bb0c53361131bf73d67ffd3ebb4140758d914489884da93b97"
     git_repo: "https://github.com/Sensing-Dev/aravis.git"
     version: "0.8.30-internal"
 
   aravis_dep:
     name: aravis_dep
-    src_path: aravis_dep
-    install_path: install/aravis_dep
-    action: download # can be 'download', 'build', or 'use_existing'
-    pkg_url: "https://github.com/Sensing-Dev/aravis/releases/download/internal-0.8.30/Aravis-0.8.30-internal-dependencies.zip"
     pkg_sha: "79a3a94c56d65fc63312cbb258f48be542993543fb74a33aaa8ab7ebc5c76354"
-    git_repo: "https://github.com/conan-io/conan-center-index.git" # use recipe here for appropriate version
+    git_repo: "" # use recipe here for appropriate version
     version: "0.8.30-internal"
 
   pygobject:
     name: pygobject
-    src_path: pygobject
-    install_path: install/pygobject
-    action: download # can be 'download', 'build', or 'use_existing'
-    pkg_url: "https://ion-kit.s3.us-west-2.amazonaws.com/dependencies/pygobject-3.42.2.zip"
     pkg_sha: "eea9465b7cbf1420ee3b3d8a78f6cfa3feeff89ffade7ab1874ebb25d7078037"
     git_repo: "https://gitlab.gnome.org/GNOME/pygobject.git"
     version: "3.42.2"
 
   ion_kit:
     name: ion-kit
-    src_path: ion-kit
-    install_path: install/ion-kit
-    action: download # can be 'download', 'build', or 'use_existing'
-    pkg_url: "https://github.com/fixstars/ion-kit/releases/download/v1.8.3/ion-kit-1.8.3-x86-64-windows.zip"
     pkg_sha: "75bf579f5465d67a4e21ffca2eaf0325216cc184c4b77d2f0b7f9cec139f9842"
     git_repo: "https://github.com/fixstars/ion-kit.git"
     version: "v1.8.3"
 
   opencv:
     name: opencv
-    src_path: opencv
-    install_path: install/opencv
-    # action: download # can be 'download', 'build', or 'use_existing'
-    pkg_url: "https://github.com/opencv/opencv/releases/download/4.5.5/opencv-4.5.5-vc14_vc15.exe"
     pkg_sha: "cac31973cd1c59bfe9dc926acbde815553d23662ea355e0414b5e50d8f8aa5a8"
+    git_repo: "https://github.com/opencv/opencv"
     version: "4.5.5"
 
   gendc_separator:
     name: gendc_separator
-    src_path: gendc_separator
-    install_path: install/gendc_separator
-    # action: download # can be 'download'
-    pkg_url: "https://github.com/Sensing-Dev/GenDC/releases/download/v0.2.8/gendc_separator_v0.2.8_win64.zip"
     pkg_sha: "bdcf560332bf90dc07ebd50d931f86003fc8cbd54336009e03828d8aa45f965d"
     git_repo: "https://github.com/Sensing-Dev/GenDC.git"
     version: "v0.2.8"

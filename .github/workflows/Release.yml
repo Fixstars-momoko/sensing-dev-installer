@@ -58,7 +58,7 @@ jobs:
     strategy:
         matrix:
           os: [ubuntu-22.04]
-          install_option : ["--version ${{ needs.set_env.outputs.ref_name }}"]
+          install_option : ["--version ${{ needs.set_env.outputs.ref_name }}", "v24.05.06"]
           with_openCV : ["", "--install-opencv"]
 
     steps:
@@ -67,7 +67,7 @@ jobs:
           mkdir setup_dir && cd setup_dir
           wget -O setup.sh https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/setup.sh
           chmod +x ${GITHUB_WORKSPACE}/setup_dir/setup.sh
-          sudo bash setup.sh ${{ matrix.install_option }} ${{ matrix.with_openCV }}
+          sudo bash setup.sh ${{ matrix.install_option }} ${{ matrix.with_openCV }} --verbose
 
       - name: Check if version_info.json exists
         id: check_version_info
@@ -131,7 +131,7 @@ jobs:
         run: |
           $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/installer.ps1"
           Invoke-WebRequest $url -OutFile .\installer.ps1
-          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 -version ${{ matrix.version }} ${{ matrix.with_openCV }}
+          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 -version ${{ matrix.version }} ${{ matrix.with_openCV }} -verbose
 
       - name: Download All Artifacts
         uses: actions/download-artifact@v4

@@ -95,14 +95,13 @@ def generate_url(cmp, version, pf):
     sys.exit(1)
 
 def get_latest_tag(owner, repo):
-    url = f"https://api.github.com/repos/{owner}/{repo}/tags"
+    url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
     response = requests.get(url)
-    response.raise_for_status()  # エラーチェック
-    tags = response.json()
+    response.raise_for_status() 
+    release_data = response.json()
     
-    if tags:
-        latest_tag = tags[0]['name']
-        return latest_tag
+    if 'tag_name' in release_data:
+        return release_data['tag_name']
     else:
         return None
     
