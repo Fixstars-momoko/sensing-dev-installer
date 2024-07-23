@@ -181,17 +181,17 @@ jobs:
           $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
           $env:SENSING_DEV_ROOT=${SENSING_DEV_ROOT} 
           $env:PATH="$env:PATH;$PATH"
-          cd ${{ github.workspace }}/download/installer/testcases/cpp/opencv_test  && cmake ./
+          cd ${{ github.workspace }}/download/installer/testcases/cpp/opencv_test && cmake ./
           cmake --build . --config Release 
-          cd Release && ./opencv_test
+          cd Release && ls && ./opencv_test
 
       - name: Test opencv (-version v24.01.04)
-        if: ${{ matrix.version == '-version v24.01.04' }}
+        if: ${{ (matrix.version == '-version v24.01.04') && (matrix.with_openCV == '-InstallOpenCV')}}
         run: |
           $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
           $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
           $env:SENSING_DEV_ROOT=${SENSING_DEV_ROOT} 
           $env:PATH="$env:PATH;$PATH"
-          cd ${{ github.workspace }}/download/installer/testcases/cpp/opencv_test_v240104  && cmake ./
+          cd ${{ github.workspace }}/download/installer/testcases/cpp/opencv_test_v240104 && cmake ./
           cmake --build . --config Release 
-          cd Release && ./opencv_test
+          cd Release && ls && ./opencv_test
