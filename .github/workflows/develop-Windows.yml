@@ -18,33 +18,38 @@ name: Generate Windows Config and test installation with script
 # TODO: after separate C++ and Python installation of Aravis, setup test
 
 on:
-  push:
-    branches-ignore:
-      - main  # This will run the build and test jobs for every push on all branches except for dev to main
-
   pull_request:
     branches:
-      - '*'  # This will run the build and test jobs for pull requests to all branches
+      - main
 
 ### modify here for update #####################################################
-env: 
-  LATEST_RELEASED_SDK: v24.05.06
+env:
+  TEST_CONFIG_VERSION_SDK: v99.99.99 
   LATEST_OPENCV_VERSION: 4.10.0
   LATEST_OPENCV_BIN_PATH: opencv/build/x64/vc16/bin
+  REPO_NAME: Sensing-Dev/sensing-dev-installer
 ################################################################################
 
 jobs:
   set_env:
     runs-on: windows-latest
     outputs:
-      LATEST_RELEASED_SDK: ${{ steps.set-vars.outputs.LATEST_RELEASED_SDK }}
+      LATEST_RELEASED_SDK: ${{ steps.get_latest_tag.outputs.LATEST_RELEASED_SDK }}
       LATEST_OPENCV_VERSION: ${{ steps.set-vars.outputs.LATEST_OPENCV_VERSION }}
       LATEST_OPENCV_BIN_PATH: ${{ steps.set-vars.outputs.LATEST_OPENCV_BIN_PATH }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Get latest release tag
+        id: get_latest_tag
+        run: |
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ env.REPO_NAME}}/releases/latest"
+          $latestTag = $releases.tag_name
+          echo "LATEST_RELEASED_SDK=$latestTag" >> $env:GITHUB_OUTPUT
+
       - name: Set environment variables 
         id: set-vars
         run: |
-          echo "LATEST_RELEASED_SDK=${{ env.LATEST_RELEASED_SDK}}" >> $env:GITHUB_OUTPUT
           echo "LATEST_OPENCV_VERSION=${{ env.LATEST_OPENCV_VERSION}}" >> $env:GITHUB_OUTPUT
           echo "LATEST_OPENCV_BIN_PATH=${{ env.LATEST_OPENCV_BIN_PATH}}" >> $env:GITHUB_OUTPUT
 
@@ -67,7 +72,7 @@ jobs:
           mkdir build && cd build
           python -m pip install --upgrade pip
           pip install -r ${{ github.workspace }}/installer/src/requirements.txt
-          python ${{ github.workspace }}/installer/src/generate_config.py -p Windows
+          python ${{ github.workspace }}/installer/src/generate_config.py -p Windows -v ${{ env.TEST_CONFIG_VERSION_SDK}}
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
@@ -105,16 +110,16 @@ jobs:
           Move-Item -Path ${{ github.workspace }}/download/installer/tools/installer.ps1 -Destination ${{ github.workspace }}/test
 
       - name: Install with the script from Artifacts (general)
-        if: ${{ !((matrix.os == 'windows-latest') && (matrix.with_openCV == '-InstallOpenCV'))}}
+        if: ${{ matrix.os != 'windows-latest' || matrix.with_openCV != '-InstallOpenCV' || matrix.install_option != format('-version {0}', needs.set_env.outputs.LATEST_RELEASED_SDK) }}
         run: |
           cd ${{ github.workspace }}/test
-          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 ${{ matrix.install_option }} ${{ matrix.with_openCV }}
+          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 ${{ matrix.install_option }} ${{ matrix.with_openCV }} -verbose
 
-      - name: Install with the script from Artifacts (with the latest MSVC with OpenCV)
-        if: ${{(matrix.os == 'windows-latest') && (matrix.with_openCV == '-InstallOpenCV')}}
+      - name: Install with the script from Artifacts (with the latest MSVC with Sensing-Dev v24.05 or earlier)
+        if: ${{ matrix.os == 'windows-latest' && matrix.with_openCV == '-InstallOpenCV' && matrix.install_option == format('-version {0}', needs.set_env.outputs.LATEST_RELEASED_SDK) }}
         run: |
           cd ${{ github.workspace }}/test
-          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 ${{ matrix.install_option }}
+          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 ${{ matrix.install_option }} -verbose
           $targetDir= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
           Invoke-WebRequest -Uri https://github.com/opencv/opencv/releases/download/${{ needs.set_env.outputs.LATEST_OPENCV_VERSION }}/opencv-${{ needs.set_env.outputs.LATEST_OPENCV_VERSION }}-windows.exe -OutFile opencv-${{ needs.set_env.outputs.LATEST_OPENCV_VERSION }}-windows.exe 
           Start-Process -FilePath opencv-${{ needs.set_env.outputs.LATEST_OPENCV_VERSION }}-windows.exe -ArgumentList "-o`"$targetDir`" -y" -Wait
@@ -163,7 +168,7 @@ jobs:
           cd Release && ls && ./ionkit_test
 
       - name: Test opencv (general)
-        if: ${{ (matrix.os == 'windows-2019') && (matrix.with_openCV == '-InstallOpenCV')}}
+        if: ${{ matrix.with_openCV == '-InstallOpenCV' && (matrix.os != 'windows-latest' || matrix.install_option != format('-version {0}', needs.set_env.outputs.LATEST_RELEASED_SDK)) }}
         run: |
           $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
           $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
@@ -174,7 +179,7 @@ jobs:
           cd Release && ./opencv_test
 
       - name: Test opencv (with the latest MSVC with OpenCV)
-        if: ${{ (matrix.os == 'windows-latest') && (matrix.with_openCV == '-InstallOpenCV')}}
+        if: ${{ matrix.with_openCV == '-InstallOpenCV' && (matrix.os == 'windows-latest' && matrix.install_option == format('-version {0}', needs.set_env.outputs.LATEST_RELEASED_SDK)) }}
         run: |
           $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
           $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")

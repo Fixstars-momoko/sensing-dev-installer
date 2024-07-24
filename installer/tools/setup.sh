@@ -103,7 +103,7 @@ check_sdk_version() {
 }
 
 install_eariler_version() {
-  reference_version=240506
+  reference_version=240599
 
   if [[ ! "$1" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[a-zA-Z0-9]*)?$ ]]; then
     error "Invalid version format. Expected format is vXX.YY.ZZ or xXX.YY.ZZ-<testid>"
@@ -122,7 +122,11 @@ install_eariler_version() {
     mkdir -p "$2/tmp"
     curl -L $prev_installer_url -o "$prev_installer_path"
     verbose "Execute old_setup.sh ($1) in $prev_installer_path"
-    bash $prev_installer_path --install-opencv $3 --version $1
+    if [ -n $3 ]; then
+      bash $prev_installer_path --version $1 --install-opencv
+    else 
+      bash $prev_installer_path --version $1
+    fi
 
     info "Install successfully."
     exit 0
@@ -208,12 +212,13 @@ if [ -n "$configPath" ]; then
   else
     version=$version_from_config
   fi
-fi
 
-if [ -z "$version" ]; then
+elif [ -z "$version" ]; then
+  # suggested installation (w/o version setting)
   verbose "Getting the latest version..."
   version=`get_latest_version $repositoryName`
 else
+  # suggested installation (w version setting)
   check_sdk_version $version 
 fi
 

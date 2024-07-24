@@ -25,9 +25,9 @@ libraries:
 
   opencv:
     name: opencv
-    pkg_sha: "cac31973cd1c59bfe9dc926acbde815553d23662ea355e0414b5e50d8f8aa5a8"
+    pkg_sha: "bff38466091c313dac21a0b73eea8278316a89c1d434c6f0b10697e087670168"
     git_repo: "https://github.com/opencv/opencv"
-    version: "4.5.5"
+    version: "4.10.0"
 
   gendc_separator:
     name: gendc_separator

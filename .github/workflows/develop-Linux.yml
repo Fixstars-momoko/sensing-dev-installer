@@ -14,36 +14,36 @@ name: Generate Linux Config and test installation with script
 # TODO: after separate C++ and Python installation of Aravis, setup test
 
 on:
-  push:
-    branches-ignore:
-      - main  # This will run the build and test jobs for every push on all branches except for dev to main
-
   pull_request:
     branches:
-      - '*'  # This will run the build and test jobs for pull requests to all branches
+      - main
 
 ### modify here for update #####################################################
 env: 
-  LATEST_RELEASED_SDK: v24.05.06
-  LATEST_OPENCV_VERSION: 4.10.0
-  LATEST_OPENCV_BIN_PATH: opencv/build/x64/vc16/bin
+  TEST_CONFIG_VERSION_SDK: v99.99.99
+  REPO_NAME: Sensing-Dev/sensing-dev-installer
 ################################################################################
 
 jobs:
   set_env:
     runs-on: ubuntu-22.04
     outputs:
-      LATEST_RELEASED_SDK: ${{ steps.set-vars.outputs.LATEST_RELEASED_SDK }}
+      LATEST_RELEASED_SDK: ${{ steps.get_latest_tag.outputs.LATEST_RELEASED_SDK }}
       LATEST_OPENCV_VERSION: ${{ steps.set-vars.outputs.LATEST_OPENCV_VERSION }}
       LATEST_OPENCV_BIN_PATH: ${{ steps.set-vars.outputs.LATEST_OPENCV_BIN_PATH }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Get latest release tag
+        id: get_latest_tag
+        run: |
+          latest_tag=$(curl -s https://api.github.com/repos/${{ env.REPO_NAME}}/releases/latest | jq -r .tag_name)
+          echo "LATEST_RELEASED_SDK=${latest_tag}" >> $GITHUB_OUTPUT
       - name: Set environment variables 
         id: set-vars
         run: |
-          echo "LATEST_RELEASED_SDK=${{ env.LATEST_RELEASED_SDK}}" >> $GITHUB_OUTPUT
           echo "LATEST_OPENCV_VERSION=${{ env.LATEST_OPENCV_VERSION}}" >> $GITHUB_OUTPUT
           echo "LATEST_OPENCV_BIN_PATH=${{ env.LATEST_OPENCV_BIN_PATH}}" >> $GITHUB_OUTPUT
-
 
   generate_config:
     runs-on: ubuntu-22.04
@@ -63,7 +63,7 @@ jobs:
           mkdir build && cd build
           python -m pip install --upgrade pip
           pip install -r ${{ github.workspace }}/installer/src/requirements.txt
-          python ${{ github.workspace }}/installer/src/generate_config.py -p Linux
+          python ${{ github.workspace }}/installer/src/generate_config.py -p Linux -v ${{ env.TEST_CONFIG_VERSION_SDK}}
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
@@ -101,7 +101,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/test
           chmod +x setup.sh
-          sudo bash setup.sh ${{ matrix.install_option }} ${{ matrix.with_openCV }}
+          sudo bash setup.sh ${{ matrix.install_option }} ${{ matrix.with_openCV }} --verbose
 
       - name: Check if version_info.json exists
         id: check_version_info
