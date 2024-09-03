@@ -173,9 +173,13 @@ else
     libgstreamer-plugins-base1.0-dev \
     libgtk-3-dev \
     gtk-doc-tools \
+    gcc libcairo2-dev pkg-config python3-dev gir1.2-gtk-4.0 \
     jq
   echo "**********"
 fi
+
+/bin/pip3 install -U pip
+/bin/pip3 install pycairo
 
 ################################################################################
 # Set default installPath if not provide
