@@ -1,0 +1,62 @@
+name: Build OpenCV 
+
+on: workflow_dispatch
+
+### modify here for update #####################################################
+env:
+  OPENCV_VERSION: 4.10.0
+################################################################################
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    name: Build Opencv 
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Check for existing cache
+      id: cache_status
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/install
+        key: ${{env.OPENCV_VERSION}}
+
+    - name: Install dependency
+      if: steps.cache_status.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update && sudo apt-get install -y  valgrind
+        valgrind --help
+      
+    - name: name:build OpenCV
+      if: steps.cache_status.outputs.cache-hit != 'true'
+      run: |
+        git clone https://github.com/opencv/opencv.git
+        cd opencv && git checkout ${{env.OPENCV_VERSION}} && mkdir build && cd build
+        cmake -D CMAKE_BUILD_TYPE=RELEASE \
+        -D INSTALL_PYTHON_EXAMPLES=OFF \
+        -D INSTALL_C_EXAMPLES=OFF \
+        -D BUILD_opencv_python2=OFF \
+        -D BUILD_opencv_python3=OFF \
+        -D CMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
+        -D WITH_GSTREAMER=OFF  ..
+        cmake --build . --parallel $(nproc) --target install
+
+    - name: Cache dependencies
+      if: steps.cache_status.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ github.workspace }}/install
+        key: ${{env.OPENCV_VERSION}}
+        
+    - name: Create a package
+      run: |
+        cd ${{ github.workspace }}/install
+        tar -zcvf ${{ github.workspace }}/opencv-${{env.OPENCV_VERSION}}-x86-64-linux.tar.gz .
+
+    - name: Release     
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+            ${{ github.workspace }}/opencv-${{env.OPENCV_VERSION}}-x86-64-linux.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
