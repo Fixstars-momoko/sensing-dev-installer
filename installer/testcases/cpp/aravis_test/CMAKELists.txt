@@ -8,6 +8,9 @@ set(SENSING_DEV_DIR $ENV{SENSING_DEV_ROOT})
 # aravis
 include_directories(${SENSING_DEV_DIR}/include/aravis-0.8)
 include_directories(${SENSING_DEV_DIR}/include/glib-2.0)
+# v24.08 or later
+include_directories(${SENSING_DEV_DIR}/lib/glib-2.0/include)
+# v24.05 or earlier
 include_directories(${SENSING_DEV_DIR}/include/glib-2.0/include)
 link_directories(${SENSING_DEV_DIR}/bin)
 link_directories(${SENSING_DEV_DIR}/lib)

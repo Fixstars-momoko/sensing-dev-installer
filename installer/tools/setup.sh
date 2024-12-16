@@ -20,6 +20,8 @@ The installation path for the Sensing SDK. Default is the sensing-dev-installer 
 
 '
 
+set -e
+
 installerName="sensing-dev"
 repositoryName="Sensing-Dev/sensing-dev-installer"
 baseUrl="https://github.com/$repositoryName/releases/download/"
@@ -27,6 +29,8 @@ baseUrl="https://github.com/$repositoryName/releases/download/"
 version=""
 installPath=""
 InstallOpenCV=false
+InstallGstPlugins=false
+InstallGstTools=false
 
 # Deprecated as of v24.05.05
 user=""
@@ -49,6 +53,8 @@ while [[ "$#" -gt 0 ]]; do
     --user) user="$2"; shift ;;
     --installPath) installPath="$2"; shift ;;
     --install-opencv) InstallOpenCV=true ;;
+    --install-gst-tools) InstallGstPlugins=true ;;
+    --install-gst-plugin) InstallGstTools=true ;;
     --debugScript) debugScript=true ;;
     --config-path) configPath="$2"; shift ;;
     --archiveAravis) archiveAravis="$2"; shift ;;
@@ -103,7 +109,7 @@ check_sdk_version() {
 }
 
 install_eariler_version() {
-  reference_version=240506
+  reference_version=240599
 
   if [[ ! "$1" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[a-zA-Z0-9]*)?$ ]]; then
     error "Invalid version format. Expected format is vXX.YY.ZZ or xXX.YY.ZZ-<testid>"
@@ -122,7 +128,11 @@ install_eariler_version() {
     mkdir -p "$2/tmp"
     curl -L $prev_installer_url -o "$prev_installer_path"
     verbose "Execute old_setup.sh ($1) in $prev_installer_path"
-    bash $prev_installer_path --install-opencv $3 --version $1
+    if [ -n $3 ]; then
+      bash $prev_installer_path --version $1 --install-opencv
+    else 
+      bash $prev_installer_path --version $1
+    fi
 
     info "Install successfully."
     exit 0
@@ -135,6 +145,8 @@ verbose "user: $user"
 verbose "installPath: $installPath"
 verbose "verbose: $verbose"
 verbose "InstallOpenCV: $InstallOpenCV"
+verbose "InstallGstPlugins: $InstallGstPlugins"
+verbose "InstallGstTools: $InstallGstTools"
 verbose "debugScript: $debugScript"
 verbose "configPath: $configPath"
 # verbose "archiveAravis: $archiveAravis"
@@ -161,7 +173,7 @@ else
   echo "**********"
   echo "Install Dependencies"
   echo "**********"
-  apt-get -y upgrade && apt-get update && apt-get install -y \
+  sudo apt-get update && sudo apt-get -y upgrade && apt-get install -y \
     curl gzip git python3-pip glib2.0 libxml2-dev \
     libgirepository1.0-dev libnotify-dev \
     libunwind-dev \
@@ -171,6 +183,31 @@ else
     gtk-doc-tools \
     jq
   echo "**********"
+fi
+
+################################################################################
+# Install Gst plugins
+################################################################################
+
+if [ -n "$InstallGstPlugins" ]; then
+  echo "**********"
+  echo "Install gst-plugins"
+  echo "**********"
+  apt-get -y upgrade && apt-get update && apt-get install -y \
+  gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly
+fi
+
+################################################################################
+# Install Gst tools
+################################################################################
+
+if [ -n "$InstallGstTools" ]; then
+  echo "**********"
+  echo "Install gst-tools"
+  echo "**********"
+  apt-get -y upgrade && apt-get update && apt-get install -y \
+  gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl \
+  gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio
 fi
 
 ################################################################################
@@ -208,12 +245,13 @@ if [ -n "$configPath" ]; then
   else
     version=$version_from_config
   fi
-fi
 
-if [ -z "$version" ]; then
+elif [ -z "$version" ]; then
+  # suggested installation (w/o version setting)
   verbose "Getting the latest version..."
   version=`get_latest_version $repositoryName`
 else
+  # suggested installation (w version setting)
   check_sdk_version $version 
 fi
 
@@ -244,12 +282,7 @@ do
   echo "**********"
   echo "Install $comp_name=$comp_version"
   echo "**********"
-  if [ $key == 'gendc_separator' ]; then
-    archive_name="gendc_separator.zip"
-    curl -L $comp_url -o $archive_name && unzip -o gendc_separator.zip -d $installPath/include && rm $archive_name
-  else
-    curl -L $comp_url | tar zx -C $installPath --strip-components 1
-  fi
+  curl -L $comp_url | tar zx -C $installPath --strip-components 1
 done
 
 if [ -n "$InstallOpenCV" ]; then

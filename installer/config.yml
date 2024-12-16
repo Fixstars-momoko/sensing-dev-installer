@@ -1,38 +1,42 @@
 libraries:
   aravis:
     name: aravis
-    pkg_sha: "1f0ef68a9d33f9bb0c53361131bf73d67ffd3ebb4140758d914489884da93b97"
+    pkg_sha: "df099e49a82ba3f4347066d15c752861dae261bac93b23a48d52f050f63ae169"
     git_repo: "https://github.com/Sensing-Dev/aravis.git"
-    version: "0.8.30-internal"
+    version: "v0.8.31-internal.1"
 
   aravis_dep:
     name: aravis_dep
-    pkg_sha: "79a3a94c56d65fc63312cbb258f48be542993543fb74a33aaa8ab7ebc5c76354"
+    pkg_sha: "a0c32b5dcf4f6d6df721edd6570b113c0a8c9f79c80a442cdf7cfe241c3a52e9"
     git_repo: "" # use recipe here for appropriate version
-    version: "0.8.30-internal"
-
-  pygobject:
-    name: pygobject
-    pkg_sha: "eea9465b7cbf1420ee3b3d8a78f6cfa3feeff89ffade7ab1874ebb25d7078037"
-    git_repo: "https://gitlab.gnome.org/GNOME/pygobject.git"
-    version: "3.42.2"
+    version: "v0.8.31-internal.1"
 
   ion_kit:
     name: ion-kit
-    pkg_sha: "75bf579f5465d67a4e21ffca2eaf0325216cc184c4b77d2f0b7f9cec139f9842"
+    pkg_sha: "6714b46f4f9f6db0806e78e69e1fee6188e520a5dfca5b134d1e007ae410fa33"
     git_repo: "https://github.com/fixstars/ion-kit.git"
-    version: "v1.8.3"
+    version: "v3.2.6"
 
   opencv:
     name: opencv
-    pkg_sha: "cac31973cd1c59bfe9dc926acbde815553d23662ea355e0414b5e50d8f8aa5a8"
+    pkg_sha: "bff38466091c313dac21a0b73eea8278316a89c1d434c6f0b10697e087670168"
     git_repo: "https://github.com/opencv/opencv"
-    version: "4.5.5"
+    version: "4.10.0"
 
   gendc_separator:
     name: gendc_separator
-    pkg_sha: "bdcf560332bf90dc07ebd50d931f86003fc8cbd54336009e03828d8aa45f965d"
+    pkg_sha: "e3bde8fce1b293d2db25bbfb0244e7c3245e523b7d64bf78ef26b5585e585959"
     git_repo: "https://github.com/Sensing-Dev/GenDC.git"
-    version: "v0.2.8"
+    version: "v0.3.5"
 
+  gst_tool:
+    name: "gstreamer tools"
+    pkg_sha: "e4ec3c67dad8aab6b9cd684b2429e2726d43c248ee9fd5c18455dcd80c419e1d"
+    git_repo: "https://github.com/Sensing-Dev/gst-plugins"
+    version: "v1.22.5.8"
 
+  gst_plugins:
+    name: "gstreamer plugins"
+    pkg_sha: "28e8a224b7f5b1de23e45bd680f56845bd792a911315a0bcfa2064af1c1aa1d0"
+    git_repo: "https://github.com/Sensing-Dev/gst-plugins"
+    version: "v1.22.5.8"

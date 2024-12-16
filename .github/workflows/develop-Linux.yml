@@ -14,37 +14,34 @@ name: Generate Linux Config and test installation with script
 # TODO: after separate C++ and Python installation of Aravis, setup test
 
 on:
-  push:
-    branches-ignore:
-      - main  # This will run the build and test jobs for every push on all branches except for dev to main
-
   pull_request:
     branches:
-      - '*'  # This will run the build and test jobs for pull requests to all branches
+      - main
 
 ### modify here for update #####################################################
 env: 
-  LATEST_RELEASED_SDK: v24.05.06
-  LATEST_OPENCV_VERSION: 4.10.0
-  LATEST_OPENCV_BIN_PATH: opencv/build/x64/vc16/bin
+  TEST_CONFIG_VERSION_SDK: v99.99.99
+  REPO_NAME: Sensing-Dev/sensing-dev-installer
 ################################################################################
 
 jobs:
   set_env:
     runs-on: ubuntu-22.04
     outputs:
-      LATEST_RELEASED_SDK: ${{ steps.set-vars.outputs.LATEST_RELEASED_SDK }}
-      LATEST_OPENCV_VERSION: ${{ steps.set-vars.outputs.LATEST_OPENCV_VERSION }}
-      LATEST_OPENCV_BIN_PATH: ${{ steps.set-vars.outputs.LATEST_OPENCV_BIN_PATH }}
+      LATEST_RELEASED_SDK: ${{ steps.get_latest_tag.outputs.LATEST_RELEASED_SDK }}
     steps:
-      - name: Set environment variables 
-        id: set-vars
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Get latest release tag
+        id: get_latest_tag
         run: |
-          echo "LATEST_RELEASED_SDK=${{ env.LATEST_RELEASED_SDK}}" >> $GITHUB_OUTPUT
-          echo "LATEST_OPENCV_VERSION=${{ env.LATEST_OPENCV_VERSION}}" >> $GITHUB_OUTPUT
-          echo "LATEST_OPENCV_BIN_PATH=${{ env.LATEST_OPENCV_BIN_PATH}}" >> $GITHUB_OUTPUT
+          latest_tag=$(curl -s https://api.github.com/repos/${{ env.REPO_NAME}}/releases/latest | jq -r .tag_name)
+          echo "LATEST_RELEASED_SDK=${latest_tag}" >> $GITHUB_OUTPUT
 
 
+
+
+        
   generate_config:
     runs-on: ubuntu-22.04
 
@@ -63,7 +60,7 @@ jobs:
           mkdir build && cd build
           python -m pip install --upgrade pip
           pip install -r ${{ github.workspace }}/installer/src/requirements.txt
-          python ${{ github.workspace }}/installer/src/generate_config.py -p Linux
+          python ${{ github.workspace }}/installer/src/generate_config.py -p Linux -v ${{ env.TEST_CONFIG_VERSION_SDK}}
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
@@ -83,6 +80,13 @@ jobs:
           os: [ubuntu-22.04]
           install_option : ["--version ${{ needs.set_env.outputs.LATEST_RELEASED_SDK }}", "--config-path config_Linux.json"]
           with_openCV : ["", "--install-opencv"]
+          with_gst_option:  ["", "--install-gst-tools", "--install-gst-tools --install-gst-plugin"]
+          exclude:
+            # InstallGstTools is not on the release version yet
+            - install_option: "--version ${{ needs.set_env.outputs.LATEST_RELEASED_SDK }}"
+              with_gst_option: "--install-gst-tools"
+            - install_option: "--version ${{ needs.set_env.outputs.LATEST_RELEASED_SDK }}"
+              with_gst_option: "--install-gst-tools --install-gst-plugin"
 
     steps:
       - name: Download All Artifacts
@@ -101,9 +105,9 @@ jobs:
         run: |
           cd ${{ github.workspace }}/test
           chmod +x setup.sh
-          sudo bash setup.sh ${{ matrix.install_option }} ${{ matrix.with_openCV }}
+          sudo bash setup.sh ${{ matrix.install_option }} ${{ matrix.with_openCV }} ${{ matrix.with_gst_option }} --verbose
 
-      - name: Check if version_info.json exists
+      - name: Check if version_info.json exists (v24.05 or later)
         id: check_version_info
         uses: andstor/file-existence-action@v3
         with:
@@ -115,7 +119,7 @@ jobs:
         with:
           python-version: "3.11.4"
 
-      - name: Test Aravis installation and Path
+      - name: Test Aravis installation and Path (v24.01 or later)
         run: |
           export LD_LIBRARY_PATH=/opt/sensing-dev/lib:/opt/sensing-dev/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
           cd ${{ github.workspace }}/download/installer/testcases/cpp/aravis_test
@@ -124,7 +128,7 @@ jobs:
           eval "$python_output"
           ./aravis_test
 
-      - name: Test ion-kit
+      - name: Test ion-kit (v24.01 or later)
         run: |
           export LD_LIBRARY_PATH=/opt/sensing-dev/lib:/opt/sensing-dev/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
           cd ${{ github.workspace }}/download/installer/testcases/cpp/ionkit_test
@@ -133,7 +137,7 @@ jobs:
           eval "$python_output"
           ./ionkit_test
 
-      - name: Test opencv
+      - name: Test opencv (v24.01 or later)
         if: ${{ (matrix.with_openCV == '--install-opencv') }}
         run: |
           export LD_LIBRARY_PATH=/opt/sensing-dev/lib:/opt/sensing-dev/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
@@ -142,6 +146,38 @@ jobs:
           echo "Python script output: $python_output"
           eval "$python_output"
           ./opencv_test
+
+      - name: Test gst-inspect-1.0 (v24.12 or later)
+        if: ${{ matrix.with_gst_option == '--install-gst-tools' ||  matrix.with_gst_option == '--install-gst-tools --install-gst-plugin'}}
+        run: |
+          gst-inspect-1.0
+          echo "==="
+          gst-inspect-1.0 queue
+  
+      - name: Test gst-plugin-base (v24.12 or later)
+        if: ${{ matrix.with_gst_option == '--install-gst-tools --install-gst-plugin' }}
+        run: |
+          gst-inspect-1.0 videoconvert
+
+      - name: Test gst-plugin-good (v24.12 or later)
+        if: ${{ matrix.with_gst_option == '--install-gst-tools --install-gst-plugin' }}
+        run: |
+          gst-inspect-1.0 multifilesrc
+
+      - name: Test gst-inspect-1.0 aravissrc (v24.12 or later)
+        if: ${{ matrix.with_gst_option == '--install-gst-tools --install-gst-plugin' }}
+        run: |
+          export GST_PLUGIN_PATH=/opt/sensing-dev/lib/x86_64-linux-gnu/gstreamer-1.0/:$GST_PLUGIN_PATH
+          export LD_LIBRARY_PATH=/opt/sensing-dev/lib:/opt/sensing-dev/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+          gst-inspect-1.0 aravissrc
+
+      - name: Test gst-inspect-1.0 gendcseparator (v24.12 or later)
+        if: ${{ matrix.with_gst_option == '--install-gst-tools --install-gst-plugin' }}
+        run: |
+          export GST_PLUGIN_PATH=/opt/sensing-dev/lib/x86_64-linux-gnu/gstreamer-1.0/:$GST_PLUGIN_PATH
+          gst-inspect-1.0 gendcseparator
+
+
 
           
 
@@ -167,7 +203,7 @@ jobs:
 
       - name: Get config content and install python modules
         run: | 
-          apt-get -y upgrade && apt-get update && apt-get install -y jq
+          apt-get -y upgrade && apt-get update && apt-get install -y jq 
           config_file="${{ github.workspace }}/download/build/config_Linux.json"
           ionkit_version=$(jq -r '.ion_kit.version' $config_file)
           gendc_separator_version=$(jq -r '.gendc_separator.version' $config_file)
@@ -180,29 +216,75 @@ jobs:
             gendc_separator_version=${gendc_separator_version:1}
           fi
           
-          pip install ion-python==$ionkit_version
+          pip install ion-contrib-python==$ionkit_version
           pip install gendc-python==$gendc_separator_version
           pip install numpy
           pip install opencv-python
+          sudo apt install -y libgirepository1.0-dev gcc libcairo2-dev pkg-config python3-dev gir1.2-gtk-4.0
+          pip install aravis-python
+          pip3 install pycairo
+          pip3 install PyGObject
 
-      # - name: Test Aravis
-      #   run: |
-      #     export GI_TYPELIB_PATH=/opt/sensing-dev/lib/x86_64-linux-gnu/girepository-1.0:$GI_TYPELIB_PATH
-      #     cd ${{ github.workspace }}/download/installer/testcases/python
-      #     python aravis_test.py
+      - name: Test Aravis
+        run: |
+          cd ${{ github.workspace }}/download/installer/testcases/python
+          python aravis_test.py
 
       - name: Test ion-kit
         run: |
           cd ${{ github.workspace }}/download/installer/testcases/python
           python ionkit_test.py
 
+      - name: Test ion-kit with Aravis
+        run: |
+          cd ${{ github.workspace }}/download/installer/testcases/python
+          export GENICAM_FILENAME=${{ github.workspace }}/download/installer/testcases/python/arv-fake-camera.xml 
+          python ionkit_contrib_test.py ${{ github.workspace }}/download/installer/testcases/python/ionkit_contrib_test.py
+
       - name: Test OpenCV
         run: |
           cd ${{ github.workspace }}/download/installer/testcases/python
           python opencv_test.py
-          
-                    
 
 
+
+
+
+  test_gst_opencv:
+    runs-on: ${{ matrix.os }}
+    needs: [set_env, generate_config]
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        python_version: ["3.10", "3.11"]      
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: install-test-for-linux
+          path: download
+
+      - name: Install Numpy
+        run: | 
+          pip3 install numpy
+
+      - name: Install gstreamer
+        run: |
+          sudo apt-get update
+          sudo apt-get install libunwind-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio -y
     
+      - name: Install OpenCV
+        run: |
+          pip3 install --no-binary opencv-python opencv-python==4.10.0.84 --verbose    
+
+      - name: Test if opencv-python is built with gstreamer
+        run: |
+          cd ${{ github.workspace }}/download/installer/testcases/python
+          python opencv_gst_test.py
     

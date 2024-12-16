@@ -4,15 +4,32 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(SENSING_DEV_DIR $ENV{SENSING_DEV_ROOT})
 
-if(NOT OpenCV_DIR)
-set(OpenCV_DIR $ENV{SENSING_DEV_ROOT}/opencv/build)
+if(DEFINED SDK_VERSION AND SDK_VERSION MATCHES "v24.01")
+    message(STATUS "CMake looks for OpenCV in the old version")
+
+    include_directories(${SENSING_DEV_DIR}/include)
+
+    link_directories(${SENSING_DEV_DIR}/lib)
+
+    set(TEST opencv_test.cpp)
+    add_executable(opencv_test ${TEST})
+    target_compile_features(opencv_test PUBLIC cxx_std_17)
+    target_link_libraries(opencv_test PRIVATE opencv_world455.lib)
+
+else() 
+    message(STATUS "CMake looks for OpenCV in the default version")
+
+    if(NOT OpenCV_DIR)
+        set(OpenCV_DIR $ENV{SENSING_DEV_ROOT}/opencv/build)
+    endif()
+    find_package(OpenCV REQUIRED PATHS ${OpenCV_DIR})
+
+    # opencv
+    include_directories(${OpenCV_DIR}/include)
+
+    set(TEST opencv_test.cpp)
+    add_executable(opencv_test ${TEST})
+    target_compile_features(opencv_test PUBLIC cxx_std_17)
+    target_link_libraries(opencv_test PRIVATE ${OpenCV_LIBS})
+
 endif()
-find_package(OpenCV REQUIRED PATHS ${OpenCV_DIR})
-
-# opencv
-include_directories(${OpenCV_DIR}/include)
-
-set(TEST opencv_test.cpp)
-add_executable(opencv_test ${TEST})
-target_compile_features(opencv_test PUBLIC cxx_std_17)
-target_link_libraries(opencv_test PRIVATE ${OpenCV_LIBS})

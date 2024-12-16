@@ -18,35 +18,33 @@ name: Generate Windows Config and test installation with script
 # TODO: after separate C++ and Python installation of Aravis, setup test
 
 on:
-  push:
-    branches-ignore:
-      - main  # This will run the build and test jobs for every push on all branches except for dev to main
-
   pull_request:
     branches:
-      - '*'  # This will run the build and test jobs for pull requests to all branches
+      - main
 
 ### modify here for update #####################################################
-env: 
-  LATEST_RELEASED_SDK: v24.05.06
+env:
+  TEST_CONFIG_VERSION_SDK: v99.99.99 
   LATEST_OPENCV_VERSION: 4.10.0
   LATEST_OPENCV_BIN_PATH: opencv/build/x64/vc16/bin
+  REPO_NAME: Sensing-Dev/sensing-dev-installer
 ################################################################################
 
 jobs:
   set_env:
     runs-on: windows-latest
     outputs:
-      LATEST_RELEASED_SDK: ${{ steps.set-vars.outputs.LATEST_RELEASED_SDK }}
-      LATEST_OPENCV_VERSION: ${{ steps.set-vars.outputs.LATEST_OPENCV_VERSION }}
-      LATEST_OPENCV_BIN_PATH: ${{ steps.set-vars.outputs.LATEST_OPENCV_BIN_PATH }}
+      LATEST_RELEASED_SDK: ${{ steps.get_latest_tag.outputs.LATEST_RELEASED_SDK }}
     steps:
-      - name: Set environment variables 
-        id: set-vars
+      - name: Get latest release tag
+        id: get_latest_tag
         run: |
-          echo "LATEST_RELEASED_SDK=${{ env.LATEST_RELEASED_SDK}}" >> $env:GITHUB_OUTPUT
-          echo "LATEST_OPENCV_VERSION=${{ env.LATEST_OPENCV_VERSION}}" >> $env:GITHUB_OUTPUT
-          echo "LATEST_OPENCV_BIN_PATH=${{ env.LATEST_OPENCV_BIN_PATH}}" >> $env:GITHUB_OUTPUT
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ env.REPO_NAME}}/releases/latest"
+          $latestTag = $releases.tag_name
+          echo "LATEST_RELEASED_SDK=$latestTag" >> $env:GITHUB_OUTPUT
+
+
+
 
 
   generate_config:
@@ -67,7 +65,7 @@ jobs:
           mkdir build && cd build
           python -m pip install --upgrade pip
           pip install -r ${{ github.workspace }}/installer/src/requirements.txt
-          python ${{ github.workspace }}/installer/src/generate_config.py -p Windows
+          python ${{ github.workspace }}/installer/src/generate_config.py -p Windows -v ${{ env.TEST_CONFIG_VERSION_SDK}}
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
@@ -75,8 +73,12 @@ jobs:
           name: install-test-for-windows
           path: |
             ${{ github.workspace }}/build/config_Windows.json
-            ${{ github.workspace }}/installer/tools/installer.ps1
+            ${{ github.workspace }}/installer/tools/*
             ${{ github.workspace }}/installer/testcases
+
+
+
+
 
   test_installation:
     runs-on: ${{ matrix.os }}
@@ -87,9 +89,13 @@ jobs:
           os: [windows-2019, windows-latest]
           install_option : ["-version ${{ needs.set_env.outputs.LATEST_RELEASED_SDK }}", "-configPath config_Windows.json"]
           with_openCV : ["", "-InstallOpenCV"]
-          # exclude:
-          #   - os: windows-latest
-          #     with_openCV: "-InstallOpenCV"
+          with_gst_option:  ["", "-InstallGstTools", "-InstallGstTools -InstallGstPlugins"]
+          exclude:
+            # InstallGstTools is not on the release version yet
+            - install_option: "-version ${{ needs.set_env.outputs.LATEST_RELEASED_SDK }}"
+              with_gst_option: "-InstallGstTools"
+            - install_option: "-version ${{ needs.set_env.outputs.LATEST_RELEASED_SDK }}"
+              with_gst_option: "-InstallGstTools -InstallGstPlugins"
 
     steps:
       - name: Download All Artifacts
@@ -104,22 +110,12 @@ jobs:
           Move-Item -Path ${{ github.workspace }}/download/build/config_Windows.json -Destination ${{ github.workspace }}/test
           Move-Item -Path ${{ github.workspace }}/download/installer/tools/installer.ps1 -Destination ${{ github.workspace }}/test
 
-      - name: Install with the script from Artifacts (general)
-        if: ${{ !((matrix.os == 'windows-latest') && (matrix.with_openCV == '-InstallOpenCV'))}}
+      - name: Install with the script from Artifacts (v24.09 or later)
         run: |
           cd ${{ github.workspace }}/test
-          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 ${{ matrix.install_option }} ${{ matrix.with_openCV }}
+          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 ${{ matrix.install_option }} ${{ matrix.with_openCV }} ${{ matrix.with_gst_option }} -verbose
 
-      - name: Install with the script from Artifacts (with the latest MSVC with OpenCV)
-        if: ${{(matrix.os == 'windows-latest') && (matrix.with_openCV == '-InstallOpenCV')}}
-        run: |
-          cd ${{ github.workspace }}/test
-          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 ${{ matrix.install_option }}
-          $targetDir= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
-          Invoke-WebRequest -Uri https://github.com/opencv/opencv/releases/download/${{ needs.set_env.outputs.LATEST_OPENCV_VERSION }}/opencv-${{ needs.set_env.outputs.LATEST_OPENCV_VERSION }}-windows.exe -OutFile opencv-${{ needs.set_env.outputs.LATEST_OPENCV_VERSION }}-windows.exe 
-          Start-Process -FilePath opencv-${{ needs.set_env.outputs.LATEST_OPENCV_VERSION }}-windows.exe -ArgumentList "-o`"$targetDir`" -y" -Wait
-
-      - name: Check if OpenCV exists on Windows
+      - name: Check if OpenCV exists on Windows (v24.09 or later)
         if: ${{ (matrix.with_openCV == '-InstallOpenCV') }}
         id: check_opencv
         run: |
@@ -131,7 +127,7 @@ jobs:
             exit 1
           }
 
-      - name: Check if version_info.json exists
+      - name: Check if version_info.json exists (v24.05 or later)
         run: |
           $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
           $target_file = Join-Path -Path "$SENSING_DEV_ROOT" -ChildPath "version_info.json"
@@ -142,7 +138,7 @@ jobs:
             exit 1
           }
 
-      - name: Test Aravis installation and Path
+      - name: Test Aravis installation and Path (v24.01 or later)
         run: |
           $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
           $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User") 
@@ -152,7 +148,7 @@ jobs:
           cmake --build . --config Release 
           cd Release && ls && ./aravis_test
 
-      - name: Test ion-kit
+      - name: Test ion-kit (v24.01 or later)
         run: |
           $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
           $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")    
@@ -162,8 +158,8 @@ jobs:
           cmake --build . --config Release 
           cd Release && ls && ./ionkit_test
 
-      - name: Test opencv (general)
-        if: ${{ (matrix.os == 'windows-2019') && (matrix.with_openCV == '-InstallOpenCV')}}
+      - name: Test opencv (v24.09 or later)
+        if: ${{ matrix.with_openCV == '-InstallOpenCV' }}
         run: |
           $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
           $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
@@ -173,34 +169,80 @@ jobs:
           cmake --build . --config Release 
           cd Release && ./opencv_test
 
-      - name: Test opencv (with the latest MSVC with OpenCV)
-        if: ${{ (matrix.os == 'windows-latest') && (matrix.with_openCV == '-InstallOpenCV')}}
+      - name: Test gst-inspect-1.0 and gstreamer (v24.12 or later)
+        if: ${{ matrix.with_gst_option == '-InstallGstTools' ||  matrix.with_gst_option == '-InstallGstTools -InstallGstPlugins'}}
         run: |
           $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
-          $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
-          $env:SENSING_DEV_ROOT=${SENSING_DEV_ROOT} 
           $env:PATH="$env:PATH;$PATH"
-          $OpenCVBin = Join-Path -Path $SENSING_DEV_ROOT -ChildPath ${{ needs.set_env.outputs.LATEST_OPENCV_BIN_PATH }} 
-          $env:PATH="$env:PATH;$OpenCVBin"
-          cd ${{ github.workspace }}/download/installer/testcases/cpp/opencv_test  && cmake ./
-          cmake --build . --config Release 
-          cd Release && ./opencv_test
+          $env:GST_PLUGIN_PATH=[Environment]::GetEnvironmentVariable("GST_PLUGIN_PATH", "User")
+          gst-inspect-1.0
 
-          
+      - name: Test gstreamer core with plugin (v24.12 or later)
+        if: ${{ matrix.with_gst_option == '-InstallGstTools -InstallGstPlugins' }}
+        run: |
+          $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
+          $env:PATH="$env:PATH;$PATH"
+          $env:GST_PLUGIN_PATH=[Environment]::GetEnvironmentVariable("GST_PLUGIN_PATH", "User")
+          gst-inspect-1.0 queue
+
+      - name: Test gst-plugin-base (v24.12 or later)
+        if: ${{ matrix.with_gst_option == '-InstallGstTools -InstallGstPlugins' }}
+        run: |
+          $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
+          $env:PATH="$env:PATH;$PATH"
+          $env:GST_PLUGIN_PATH=[Environment]::GetEnvironmentVariable("GST_PLUGIN_PATH", "User")
+          gst-inspect-1.0 videoconvert
+
+      - name: Test gst-plugin-good (v24.12 or later)
+        if: ${{ matrix.with_gst_option == '-InstallGstTools -InstallGstPlugins' }}
+        run: |
+          $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
+          $env:PATH="$env:PATH;$PATH"
+          $env:GST_PLUGIN_PATH=[Environment]::GetEnvironmentVariable("GST_PLUGIN_PATH", "User")
+          gst-inspect-1.0 multifilesrc
+
+      - name: Test gst-inspect-1.0 aravissrc (v24.12 or later)
+        if: ${{ matrix.with_gst_option == '-InstallGstTools' ||  matrix.with_gst_option == '-InstallGstTools -InstallGstPlugins'}}
+        run: |
+          $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
+          $env:PATH="$env:PATH;$PATH"
+          $env:GST_PLUGIN_PATH=[Environment]::GetEnvironmentVariable("GST_PLUGIN_PATH", "User")
+          gst-inspect-1.0 aravissrc
+
+      - name: Test gst-inspect-1.0 gendcseparator (v24.12 or later)
+        if: ${{ matrix.with_gst_option == '-InstallGstTools' ||  matrix.with_gst_option == '-InstallGstTools -InstallGstPlugins'}}
+        run: |
+          $PATH =  [Environment]::GetEnvironmentVariable("PATH", "User")
+          $env:PATH="$env:PATH;$PATH"
+          $env:GST_PLUGIN_PATH=[Environment]::GetEnvironmentVariable("GST_PLUGIN_PATH", "User")
+          gst-inspect-1.0 gendcseparator
+
+
+
+
 
   test_python:
     runs-on: ${{ matrix.os }}
     needs: [set_env, generate_config]
     strategy:
       matrix:
-        os: [windows-2019, windows-latest]
+        os: [windows-latest]
         python_version: ["3.10", "3.11"]
 
     steps:
+      - name: Disable perl
+        run: |
+          rm -r C:\Strawberry\perl
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python_version }}
+
+      - name: Setup winget
+        uses: Cyberboss/install-winget@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
@@ -219,28 +261,110 @@ jobs:
           if ( $gendc_separator_version.StartsWith("v") ){ 
             $gendc_separator_version = $gendc_separator_version.substring(1)
           }
-          pip install ion-python==$ionkit_version
+          pip install ion-contrib-python==$ionkit_version
           pip install gendc-python==$gendc_separator_version
           pip install numpy
           pip install opencv-python
-
-      # - name: Test Aravis
-      #   run: |
-      #     cd ${{ github.workspace }}/download/installer/testcases/python
-      #     python aravis_test.py
+          pip install aravis-python
 
       - name: Test ion-kit
         run: |
           cd ${{ github.workspace }}/download/installer/testcases/python
           python ionkit_test.py
 
+      - name: Test ion-kit with Aravis
+        run: |
+          cd ${{ github.workspace }}/download/installer/testcases/python
+          $ENV:GENICAM_FILENAME = "${{ github.workspace }}/download/installer/testcases/python/arv-fake-camera.xml"
+          python ionkit_contrib_test.py ${{ github.workspace }}/download/installer/testcases/python/ionkit_contrib_test.py
+
       - name: Test OpenCV
         run: |
           cd ${{ github.workspace }}/download/installer/testcases/python
           python opencv_test.py
+
+      - name: Install pygobject
+        run: |
+          cd ${{ github.workspace }}/download/installer/tools
+          dir
+          .\pygobject_installer
+
+      - name: Test Aravis
+        run: |
+          cd ${{ github.workspace }}/download/installer/testcases/python
+          python aravis_test.py
+
+
           
-                    
-
-
     
-    
+  test_gst_opencv:
+    runs-on: ${{ matrix.os }}
+    needs: [set_env, generate_config]
+    strategy:
+      matrix:
+        install_option : ["-version ${{ needs.set_env.outputs.LATEST_RELEASED_SDK }}", "-configPath config_Windows.json"]
+        os: [windows-latest]
+        python_version: ["3.10", "3.11"]
+        overwrite_opencv: [true, false]
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: install-test-for-windows
+          path: download
+
+      - name: Set all items under test directory
+        run: | 
+          New-Item -ItemType Directory -Path ${{ github.workspace }}/test | Out-Null
+          Move-Item -Path ${{ github.workspace }}/download/build/config_Windows.json -Destination ${{ github.workspace }}/test
+          Move-Item -Path ${{ github.workspace }}/download/installer/tools/installer.ps1 -Destination ${{ github.workspace }}/test
+
+      - name: Install Sensing-Dev with the script from Artifacts (general)
+        run: |
+          cd ${{ github.workspace }}/test
+          powershell.exe -ExecutionPolicy Bypass -File .\installer.ps1 ${{ matrix.install_option }} -verbose
+
+      - name: Install Numpy
+        run: | 
+          pip install numpy==2.1.1 
+          
+      - name: Install OpenCV (for overwrite test)
+        if: ${{ matrix.overwrite_opencv }}
+        continue-on-error: true
+        run: |
+          pip install opencv-python
+          $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
+          $GST_SENSING_DEV = Join-Path -Path $SENSING_DEV_ROOT -ChildPath "bin"
+          cd ${{ github.workspace }}/download/installer/testcases/python
+          python opencv_gst_test.py $GST_SENSING_DEV
+          if ($LASTEXITCODE -ne 0) {
+              Write-Output "This opencv-python is not built with Gstreamer"
+          } else {
+              Write-Output "This opencv-python is built with Gstreamer"
+          } 
+
+      - name: Run opencv-python with gstreamer installer script
+        run: | 
+          cd ${{ github.workspace }}/download/installer/tools/
+          powershell.exe -ExecutionPolicy Bypass -File .\opencv_python_installer.ps1
+
+      - name: Test opencv-python with gstreamer
+        run: |
+          $SENSING_DEV_ROOT= [Environment]::GetEnvironmentVariable("SENSING_DEV_ROOT", "User")
+          $GST_SENSING_DEV = Join-Path -Path $SENSING_DEV_ROOT -ChildPath "bin"
+          cd ${{ github.workspace }}/download/installer/testcases/python
+          python opencv_gst_test.py $GST_SENSING_DEV
+          if ($LASTEXITCODE -eq 0) {
+              Write-Output "PASSED This opencv-python is built with Gstreamer"
+          } else {
+              Write-Output "FAILED: This opencv-python is not built with Gstreamer"
+              exit 1
+          }
+          
+          

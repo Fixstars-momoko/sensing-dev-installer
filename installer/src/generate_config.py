@@ -19,38 +19,54 @@ def remove_v(version):
         return version[1:]
     else:
         return version
-
+    
+def get_aravis_0_8_30_internal_url(pf):
+    if pf == 'Windows':
+        return 'https://github.com/Sensing-Dev/aravis/releases/download/internal-0.8.30/aravis-internal-0.8.30-win64.zip'
+    elif pf == 'Linux':
+        return 'https://github.com/Sensing-Dev/aravis/releases/download/internal-0.8.30/aravis-internal-0.8.30-x86-64-linux.tar.gz'
+    else:
+        print('Platform', pf, 'is not supported.')
+        sys.exit(1)
+    
+def get_aravis_dep_0_8_30_internal_url(pf):
+    if pf == 'Windows':
+        return 'https://github.com/Sensing-Dev/aravis/releases/download/internal-0.8.30/Aravis-0.8.30-internal-dependencies.zip'
+    elif pf == 'Linux':
+        return None
+    else:
+        print('Platform', pf, 'is not supported.')
+        sys.exit(1)
+    
 def generate_url(cmp, version, pf):
     updated_ver = version
     url = ''
 
     if cmp == 'aravis':
         url = 'https://github.com/Sensing-Dev/aravis/releases/download/' + version
-        if pf == 'Windows':
-            if version == '0.8.30-internal':
-                url = 'https://github.com/Sensing-Dev/aravis/releases/download/internal-0.8.30/aravis-internal-0.8.30-win64.zip'
-            else:
-                url += '/aravis-' + version + '-win64.zip'
-        elif pf == 'Linux':
-            if version == '0.8.30-internal':
-                url = 'https://github.com/Sensing-Dev/aravis/releases/download/internal-0.8.30/aravis-internal-0.8.30-x86-64-linux.tar.gz'
-            else:
-                url += '/aravis-' + version + '-x86-64-linux.tar.gz'
+        if version == '0.8.30-internal':
+            url = get_aravis_0_8_30_internal_url(pf)
         else:
-            print('Platform', pf, 'is not supported.')
-            sys.exit(1)
+            if pf == 'Windows':
+                url += '/aravis-' + remove_v(version) + '-x86-64-windows.zip'
+            elif pf == 'Linux':
+                url += '/aravis-' + remove_v(version) + '-x86-64-linux.tar.gz'
+            else:
+                print('Platform', pf, 'is not supported.')
+                sys.exit(1)
     elif cmp =='aravis_dep':
-        url = 'https://github.com/Sensing-Dev/aravis/releases/download/' + version
-        if pf == 'Windows':
-            if version == '0.8.30-internal':
-                url = 'https://github.com/Sensing-Dev/aravis/releases/download/internal-0.8.30/Aravis-0.8.30-internal-dependencies.zip'
-            else:
-                url += '/Aravis-' + version + '-dependencies.zip'
-        elif pf == 'Linux':
+        if pf == 'Linux':
             return None, updated_ver
+        url = 'https://github.com/Sensing-Dev/aravis/releases/download/' + version
+
+        if version == '0.8.30-internal':
+            url = get_aravis_dep_0_8_30_internal_url(pf)
         else:
-            print('Platform', pf, 'is not supported.')
-            sys.exit(1)
+            if pf == 'Windows':
+                url += '/aravis-' + remove_v(version) + '-dependencies.zip'
+            else:
+                print('Platform', pf, 'is not supported.')
+                sys.exit(1)
     elif cmp == 'ion_kit':
         url = 'https://github.com/fixstars/ion-kit/releases/download/' + version
         if pf == 'Windows':
@@ -81,8 +97,21 @@ def generate_url(cmp, version, pf):
             print('Platform', pf, 'is not supported.')
             sys.exit(1)
     elif cmp == 'gendc_separator':
-        if pf == 'Windows' or pf =='Linux':
-            url = 'https://github.com/Sensing-Dev/GenDC/releases/download/' + version + '/gendc_separator_' + version + '_win64.zip'
+        if pf == 'Windows':
+            url = 'https://github.com/Sensing-Dev/GenDC/releases/download/' + version + '/gendc-' + version + '-win64.zip'
+        elif pf =='Linux':
+            url = 'https://github.com/Sensing-Dev/GenDC/releases/download/' + version + '/gendc-' + version + '-linux.tar.gz'
+        else:
+            print('Platform', pf, 'is not supported.')
+            sys.exit(1)
+    elif cmp == 'gst_tool':
+        if pf == 'Linux':
+            return None, updated_ver
+        url = 'https://github.com/Sensing-Dev/gst-plugins/releases/download/{}/gst-tools-{}-win64.zip'.format(version, version)
+    elif cmp == 'gst_plugins':
+        if pf == 'Linux':
+            return None, updated_ver
+        url = 'https://github.com/Sensing-Dev/gst-plugins/releases/download/{}/gst-plugins-{}-win64.zip'.format(version, version)
     else:
         print(cmp, 'is not supported')
         sys.exit(1)
@@ -119,7 +148,7 @@ if __name__ == '__main__':
 
     input_file_name = 'config.yml'
 
-    comp_names = ['aravis', 'aravis_dep', 'ion_kit', 'opencv', 'gendc_separator']
+    comp_names = ['aravis', 'aravis_dep', 'ion_kit', 'opencv', 'gendc_separator', 'gst_tool', 'gst_plugins']
 
     dst_dir = os.path.join(root_dir, 'build')
     if not os.path.exists(dst_dir):
@@ -154,6 +183,7 @@ if __name__ == '__main__':
                 'version' : version
             }
 
+            print("\tgenerate ", os.path.join(dst_dir, 'config_' + pf+ '.json'))
             with open(os.path.join(dst_dir, 'config_' + pf+ '.json'), 'w', encoding='utf-8') as f:
                 json.dump(out, f, indent=4)
 
